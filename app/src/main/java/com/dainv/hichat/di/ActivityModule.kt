@@ -1,13 +1,18 @@
 package com.dainv.hichat.di
 
 
+import android.telecom.Call
+import com.dainv.hichat.CallActivity
 import com.dainv.hichat.MainActivity
 
 import dagger.Module
 import dagger.android.ContributesAndroidInjector
 
-@Module
-internal abstract class ActivityModule {
+@Module()
+abstract class ActivityModule {
     @ContributesAndroidInjector
-    internal abstract fun mainActivity(): `fun`
+    abstract fun mainActivity(): MainActivity
+
+    @ContributesAndroidInjector
+    abstract fun callActivity(): CallActivity
 }
