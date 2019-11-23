@@ -3,6 +3,7 @@ package com.dainv.hichat
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
@@ -21,6 +22,7 @@ import java.util.*
 import java.util.concurrent.Executors
 import javax.inject.Inject
 import kotlin.collections.ArrayList
+import kotlin.text.Typography.dagger
 
 class CallActivity : AppCompatActivity() {
 
@@ -52,8 +54,10 @@ class CallActivity : AppCompatActivity() {
     private lateinit var localAudioTrack: AudioTrack
     private lateinit var videoSource: VideoSource
     private lateinit var localVideoTrack: VideoTrack
+    private var remoteVideoTrack: VideoTrack? = null
     private lateinit var sufaceTextureHelper: SurfaceTextureHelper
 
+    private var isStartCapture = false
 
     //sdp
     private var localSDP: SessionDescription? = null
@@ -62,6 +66,7 @@ class CallActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         AndroidInjection.inject(this)
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_call)
         getParamIntent()
         // check permission
@@ -83,6 +88,7 @@ class CallActivity : AppCompatActivity() {
         connectToRoom()
     }
 
+
     private fun connectToRoom() {
         if (room == null) {
             return
@@ -97,6 +103,7 @@ class CallActivity : AppCompatActivity() {
             connectedToRoom(it)
         }
     }
+
 
     private fun connectedToRoom(data: String) {
         videoCapturer = createCameraCapturer()
@@ -123,6 +130,9 @@ class CallActivity : AppCompatActivity() {
             peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, pCObserver)!!
             peerConnection?.addTrack(createAudioTrack())
             peerConnection?.addTrack(createVideoTrack())
+
+            remoteVideoTrack = getRemoteVideoTrack()
+            remoteVideoTrack?.addSink(videoRemote)
             sdpMediaConstraints = MediaConstraints()
             sdpMediaConstraints!!.mandatory.add(
                 MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true")
@@ -136,20 +146,25 @@ class CallActivity : AppCompatActivity() {
                 if (jsonObject["dataRooms"] != null) {
                     val dataRooms = jsonObject["dataRooms"].asJsonObject
                     if (dataRooms["sdp"] != null) {
-                        val remoteSDP = dataRooms["sdp"].asString
+                        val remoteSDP = gson.fromJson<SessionDescription>(
+                            dataRooms["sdp"].asString,
+                            SessionDescription::class.java
+                        )
                         peerConnection?.setRemoteDescription(
-                            sdpObserver,
-                            SessionDescription(SessionDescription.Type.OFFER, remoteSDP)
+                            sdpObserver, remoteSDP
                         )
                         peerConnection?.createAnswer(sdpObserver, sdpMediaConstraints)
                     }
                     if (dataRooms["iceCandidates"] != null) {
-                        val iceCandidates = Gson().fromJson<List<IceCandidate>>(
-                            dataRooms["iceCandidates"].asString,
-                            object : TypeToken<List<IceCandidate>>() {}.type
-                        )
-                        iceCandidates.forEach {
-                            addIceCandidate(it)
+                        val iceCandidates = ArrayList<IceCandidate>()
+                        val jsonArray = dataRooms["iceCandidates"].asJsonArray
+                        for (jsonIce in jsonArray) {
+                            val iceCandidate = gson.fromJson<IceCandidate>(
+                                jsonIce.asString,
+                                IceCandidate::class.java
+                            )
+                            addIceCandidate(iceCandidate)
+
                         }
                     }
                 }
@@ -173,13 +188,20 @@ class CallActivity : AppCompatActivity() {
 
     private fun listenEventInRoom() {
         socketConnector.socket?.on(SocketConstant.SDP_EVENT) {
-            val data = it[0].toString()
-            val sdp = gson.fromJson<SessionDescription>(data, SessionDescription::class.java)
-            if (isInit) {
-                val sdpAnswer = SessionDescription(SessionDescription.Type.ANSWER, sdp.description)
-                peerConnection?.setRemoteDescription(sdpObserver, sdpAnswer)
-
+            executor.execute {
+                val data = it[0].toString()
+                val sdp = gson.fromJson<SessionDescription>(data, SessionDescription::class.java)
+                peerConnection?.setRemoteDescription(sdpObserver, sdp)
+                runOnUiThread {
+                    Toast.makeText(
+                        applicationContext,
+                        "set remote sdp - type: ${sdp.type}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
+
+
         }
         socketConnector.socket?.on(SocketConstant.ICE_CANDIDATE_EVENT) {
             val data = it[0].toString()
@@ -255,14 +277,24 @@ class CallActivity : AppCompatActivity() {
         }
     }
 
-    fun createAudioTrack(): AudioTrack {
+    private fun createAudioTrack(): AudioTrack {
         val mediaConstraints = MediaConstraints()
         audioSource = peerConnectionFactory.createAudioSource(mediaConstraints)
         localAudioTrack = peerConnectionFactory.createAudioTrack(LOCAL_AUDIO_TRACK_ID, audioSource)
         return localAudioTrack
     }
 
-    fun createVideoTrack(): VideoTrack {
+    private fun getRemoteVideoTrack(): VideoTrack? {
+        for (transceiver in peerConnection?.transceivers!!) {
+            val track = transceiver.receiver.track()
+            if (track is VideoTrack) {
+                return track
+            }
+        }
+        return null
+    }
+
+    private fun createVideoTrack(): VideoTrack {
         sufaceTextureHelper = SurfaceTextureHelper.create("Capture video", elgBase.eglBaseContext)
         videoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
         videoCapturer!!.initialize(
@@ -270,7 +302,8 @@ class CallActivity : AppCompatActivity() {
             applicationContext,
             videoSource.capturerObserver
         )
-        videoCapturer!!.startCapture(1280, 720, 60)
+        videoCapturer!!.startCapture(1080, 1920, 60)
+        isStartCapture = true
         localVideoTrack = peerConnectionFactory.createVideoTrack(LOCAL_VIDEO_TRACK_ID, videoSource)
         localVideoTrack.setEnabled(true)
         localVideoTrack.addSink(videoLocal)
@@ -286,12 +319,27 @@ class CallActivity : AppCompatActivity() {
         )
     }
 
+
     override fun onResume() {
         super.onResume()
+        peerConnection?.let {
+            if (!isStartCapture) {
+                videoCapturer!!.startCapture(1080, 1920, 60)
+                isStartCapture = true
+            }
+
+        }
     }
 
     override fun onPause() {
         super.onPause()
+        peerConnection?.let {
+            if (isStartCapture) {
+                videoCapturer!!.stopCapture()
+                isStartCapture = false
+            }
+        }
+
     }
 
     override fun onDestroy() {
@@ -323,17 +371,27 @@ class CallActivity : AppCompatActivity() {
         }
 
         override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
-            Timber.e("PCObserver : onIceConnectionChange()")
-
+            Timber.e("PCObserver : onIceConnectionChange(): ${p0.toString()}")
+            runOnUiThread {
+                Toast.makeText(
+                    applicationContext,
+                    "onIceConnectionChange : ${p0.toString()}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
 
         override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {
-            Timber.e("PCObserver : onIceConnectionChange()")
+            Timber.e("PCObserver : onIceGatheringChange()")
 
         }
 
         override fun onAddStream(p0: MediaStream?) {
             Timber.e("PCObserver : MediaStream()")
+            runOnUiThread {
+                Toast.makeText(applicationContext, "onAddStream", Toast.LENGTH_LONG).show()
+            }
+
         }
 
         override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
