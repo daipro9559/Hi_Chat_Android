@@ -1,8 +1,7 @@
 package com.dainv.hichat.socket
 
 import android.content.Context
-import android.util.Log
-import com.dainv.hichat.const.SocketConstant
+import com.dainv.hichat.constant.SocketConstant
 import com.dainv.hichat.util.SocketCallback
 import com.github.nkzawa.socketio.client.Ack
 import com.github.nkzawa.socketio.client.IO
