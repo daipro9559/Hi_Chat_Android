@@ -11,7 +11,7 @@ class AppModule{
 
     @Provides
     @Singleton
-    fun provideContext(app: Application) = app.applicationContext
+    fun provideContext(app: Application) = app.applicationContext!!
 
     @Provides
     @Singleton

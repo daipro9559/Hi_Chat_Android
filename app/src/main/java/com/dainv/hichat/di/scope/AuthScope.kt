@@ -1,4 +1,7 @@
 package com.dainv.hichat.di.scope
 
-class AuthScope {
+import javax.inject.Scope
+
+@Scope
+annotation class AuthScope {
 }

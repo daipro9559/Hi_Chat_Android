@@ -25,12 +25,4 @@
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 
-    <style name="ActivityFullScreen" parent="AppTheme">
-        <item name="windowNoTitle">true</item>
-        <item name="android:windowFullscreen">true</item>
-    </style>
-    <style name="SplashTheme" parent="ActivityFullScreen">
-        <item name="android:windowBackground">@drawable/bg_window_splash</item>
-    </style>
-
 </resources>
