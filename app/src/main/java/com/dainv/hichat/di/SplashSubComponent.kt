@@ -14,7 +14,10 @@ import dagger.android.AndroidInjector
 @Subcomponent(modules = [SplashActivityModule::class])
 interface SplashSubComponent : AndroidInjector<SplashActivity> {
     @Subcomponent.Factory
-     interface Factory : AndroidInjector.Factory<SplashActivity>{
-
+    interface Factory : AndroidInjector.Factory<SplashActivity> {
+        override fun create(instance: SplashActivity?): AndroidInjector<SplashActivity> {
+        }
     }
+
+
 }

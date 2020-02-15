@@ -3,6 +3,7 @@ package com.dainv.hichat.di
 import android.app.Application
 import com.dainv.hichat.app.HiChatApplication
 import com.dainv.hichat.di.modules.ActivityModule
+import com.dainv.hichat.di.modules.SplashActivityModule
 import dagger.BindsInstance
 import dagger.Component
 import dagger.android.AndroidInjectionModule
@@ -18,12 +19,12 @@ import javax.inject.Singleton
         ]
 )
 interface AppComponent {
-    @Component.Builder
-    interface Builder {
-        @BindsInstance
-        fun application(application: Application): Builder
-        fun build(): AppComponent
+    @Component.Factory
+    interface Factory {
+        fun create(@BindsInstance application: Application): AppComponent
     }
 
     fun inject(hiChatApplication: HiChatApplication)
+
+    fun  splashSubcomponentFactory(@BindsInstance test :String):  SplashSubComponent.Factory
 }

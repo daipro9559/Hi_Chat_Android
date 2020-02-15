@@ -1,7 +1,6 @@
 package com.dainv.hichat.socket
 
 import android.content.Context
-import com.dainv.hichat.constant.SocketConstant
 import com.dainv.hichat.util.SocketCallback
 import com.github.nkzawa.socketio.client.Ack
 import com.github.nkzawa.socketio.client.IO
@@ -35,7 +34,7 @@ class SocketConnector
 
     fun connectToRoom(room: String, socketCallback: SocketCallback<String>) {
         if (socket?.connected()!!) {
-            socket?.emit(SocketConstant.ROOM_INIT, room, Ack {
+            socket?.emit("", room, Ack {
                 currentRoom = room
                 socketCallback.invoke(it[0].toString())
             })

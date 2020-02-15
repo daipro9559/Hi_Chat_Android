@@ -19,9 +19,8 @@ import dagger.multibindings.IntoMap
 @Suppress("unused")
 @Module(subcomponents = [SplashSubComponent::class])
 abstract class ActivityModule {
-
     @Binds
     @IntoMap
     @ActivityKey(SplashActivity::class)
-    abstract fun bindYourAndroidInjectorFactory(factory: SplashSubComponent.Builder): AndroidInjector.Factory<out Activity>
+    abstract fun bindYourAndroidInjectorFactory(factory: SplashSubComponent.Factory): AndroidInjector.Factory<*>
 }
